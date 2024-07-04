@@ -96,7 +96,7 @@ if __name__ == "__main__":
     L = 5  # Total number of levels
     y_L = -3.8  # Failure threshold
     
-    np.random.seed(5)
+    np.random.seed(0)
     p_f = mle(N, 0, p0=p_0, L=L)
     print("The failure probability is {:.2e}".format(p_f))
     
@@ -133,7 +133,7 @@ if __name__ == "__main__":
     # plt.show()
     
     L_b = [0, 5]#, 10, 20]
-    p_0 = [0.05]#, 0.05]#, 0.2, 0.25]
+    p_0 = [0.05, 0.1]#, 0.2, 0.25]
     
     plt.figure(figsize=(8, 6))
     plt.xscale("log")
