@@ -37,9 +37,8 @@ def adaptive_multilevel_subset_simulation(L, gamma, y_L):
     y = [-1.3, -2, -2.8, -3.3, y_L]
     tol = 0.03
     
-    i = 0
-    N_l = 0
-    err = 10e6
+    total_cost = 0
+    i, N_l, err = 0, 0, 10e6
     G_l = np.array([])
     while err > tol:
         i += 1
@@ -56,6 +55,7 @@ def adaptive_multilevel_subset_simulation(L, gamma, y_L):
         
     p_f = p_hat
     # print("level: ", 1, "p_hat:", p_hat)
+    total_cost += N_l
         
     for l in range(1, L):
         G_l = G_l[mask][:1]
@@ -88,21 +88,23 @@ def adaptive_multilevel_subset_simulation(L, gamma, y_L):
             
         p_f *= p_hat
         # print("level: ", l+1, "p_hat:", p_hat)
+        total_cost += N_l
         
-    return p_f
+    return p_f, total_cost
 
 if __name__ == "__main__":
     L = 5
     gamma = 0.5
     y_L = -3.8
     
-    np.random.seed(0)
+    # np.random.seed(0)
     start = time.time()
-    p_f = adaptive_multilevel_subset_simulation(L, gamma, y_L)
+    p_f, cost = adaptive_multilevel_subset_simulation(L, gamma, y_L)
     print("The failure probability is {:.2e}".format(p_f))
     print("Time: ", time.time() - start)
     
-    failure_probabilities = [adaptive_multilevel_subset_simulation(L, gamma, y_L) for _ in range(1000)]
+    results = [adaptive_multilevel_subset_simulation(L, gamma, y_L) for _ in range(1000)]
+    failure_probabilities, costs = zip(*results)
     print("The mean of the failure probability: ", np.mean(failure_probabilities))
     # print("The failure probabilities: ", failure_probabilities)
     
@@ -131,5 +133,17 @@ if __name__ == "__main__":
     plt.ylabel('Empirical CDF')
     plt.title('Empirical CDF of Probabilities')
     plt.legend()
+    plt.grid(True)
+
+    relative_errors = [rRMSE(p, c) for p, c in results]
+    
+    # Plot the complexity results
+    plt.figure(figsize=(8, 6))
+    plt.scatter(relative_errors, costs, alpha=0.5, marker='.')
+    plt.xscale("log")
+    plt.yscale("log")
+    plt.xlabel('Relative Error')
+    plt.ylabel('Cost (Number of Samples)')
+    plt.title('Complexity Results: Relative Error vs Cost')
     plt.grid(True)
     plt.show()

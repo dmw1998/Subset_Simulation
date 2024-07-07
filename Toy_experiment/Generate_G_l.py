@@ -71,8 +71,10 @@ def modified_metropolis_hastings(G_l, kappa, N, l, c_l, gamma = 0.5,  proposal_s
     return G_l
 
 def k(w):
-    return 0.5 if -1 <= w <= 1 else 0
+    # return 0.5 if -1 <= w <= 1 else 0
     # return np.random.choice([-1, 1])
+    return np.random.uniform(-1, 1) / 3
+    # return 0.1
 
 def sample_new_G(G_l, N, l, c_l, gamma = 0.5):
     # input:
