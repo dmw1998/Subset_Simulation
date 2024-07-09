@@ -2,9 +2,41 @@ import numpy as np
 import time
 import matplotlib.pyplot as plt
 
-from genrate_y_l import y_l
-from Generate_G_l import *
 from adaptive_multilevel_subset_simulation import rRMSE
+
+def k(w):
+    # return 0.5 if -1 <= w <= 1 else 0
+    # return np.random.choice([-1, 1])
+    return np.random.uniform(-1, 1) / 3
+    # return 0.1
+
+def sample_new_G(G_l, N, l, c_l, gamma = 0.5):
+    # input:
+    # G_l: samples in failure domain
+    
+    # output:
+    # G_l: new samples for next level
+    
+    N0 = len(G_l)
+    
+    if N0 == 0:
+        G_l = np.random.normal(0, 1, N)
+        N0 = 1
+    
+    for i in range(N - N0):
+        # Propose a new sample for G ~ N(0,1)
+        G_new = 0.8 * G_l[i] + np.sqrt(1 - 0.8 ** 2) * np.random.normal(0, 1)
+        # Propose a new noise for kappa ~ U({-1, 1})
+        kappa_new = k(G_new)
+        # Compute the new G_l
+        G_l_new = G_new + kappa_new * gamma ** l
+        
+        if G_l_new <= c_l:
+            G_l = np.append(G_l, G_l_new)
+        else:
+            G_l = np.append(G_l, G_l[i])
+            
+    return G_l
 
 def adaptive_subset_simulation_sr(L, gamma, y_L, N):
     # input:
@@ -39,8 +71,8 @@ def adaptive_subset_simulation_sr(L, gamma, y_L, N):
         
     for l in range(1, L):
         while True:
+            total_cost += N - len(G_l)
             G_l = sample_new_G(G_l, N, l + 1, y[l - 1], gamma)
-            total_cost += N
             
             mask = G_l <= y[l]
             G_l = G_l[mask]
@@ -59,12 +91,14 @@ if __name__ == "__main__":
     TOL = 0.03
     
     np.random.seed(1)
-    num_simulations = 100
+    num_simulations = 1000
     results = [adaptive_subset_simulation_sr(L, gamma, y_L, N) for _ in range(num_simulations)]
     failure_probabilities, costs = zip(*results)
     
     mean_failure_probability = np.mean(failure_probabilities)
     print("The mean of the failure probability: ", mean_failure_probability)
+    
+    print("The mean of the total cost: ", np.mean(costs))
     
     from confidence_interval import bootstrap_confidence_interval
     
@@ -91,28 +125,16 @@ if __name__ == "__main__":
     plt.title('Empirical CDF of Probabilities')
     plt.legend()
     plt.grid(True)
-    plt.show()
+    # plt.show()
     
     # Calculate relative errors
-    relative_errors = [rRMSE(p, N) for p, N in zip(failure_probabilities, costs)]
+    # relative_errors = [rRMSE(p, N) for p, N in zip(failure_probabilities, costs)]
     
-    # Plot the complexity results
-    mean_cost = np.mean(costs)
-    mean_relative_error = np.mean(relative_errors)
-    
+    # Plot the distribution of costs
     plt.figure(figsize=(8, 6))
-    plt.scatter(relative_errors, costs, alpha=0.5, marker='.', label='Simulation Results')
-    
-    # Plot the theoretical curve \epsilon^{-4}
-    epsilon = np.linspace(min(relative_errors), max(relative_errors), 100)
-    theoretical_cost = epsilon ** -4
-    plt.plot(epsilon, theoretical_cost, 'r--', label=r'Theory: $\epsilon^{-4}$')
-    
-    plt.xscale("log")
-    plt.yscale("log")
-    plt.xlabel('Relative Error')
-    plt.ylabel('Cost (Number of Samples)')
-    plt.title('Complexity Results: Relative Error vs Cost')
-    plt.legend()
+    plt.hist(costs, bins=50, edgecolor='black', alpha=0.7)
+    plt.xlabel('Cost')
+    plt.ylabel('Frequency')
+    plt.title('Distribution of Costs')
     plt.grid(True)
     plt.show()
