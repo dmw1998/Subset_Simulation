@@ -9,7 +9,37 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from Generate_G_l import *
+def k(w):
+    return np.random.uniform(-1, 1) / 3
+    # return 0.3 * np.random.choice([-1, 1])
+
+def sample_new_G(G_l, N, l, c_l, gamma = 0.5):
+    # input:
+    # G_l: samples in failure domain
+    
+    # output:
+    # G_l: new samples for next level
+    
+    N0 = len(G_l)
+    
+    if N0 == 0:
+        N0 = 0.1 * N
+        G_l = np.random.normal(0, 1, N0)
+    
+    for i in range(N - N0):
+        # Propose a new sample for G ~ N(0,1)
+        G_new = 0.8 * G_l[i] + np.sqrt(1 - 0.8 ** 2) * np.random.normal(0, 1)
+        # Add noise
+        kappa_new = k(G_new)
+        # Compute the new G_l
+        G_l_new = G_new + kappa_new * gamma ** l
+        
+        if G_l_new <= c_l:
+            G_l = np.append(G_l, G_l_new)
+        else:
+            G_l = np.append(G_l, G_l[i])
+            
+    return G_l
 
 def classical_subset_simulation(N, y_L = -3.8, p0 = 0.1, gamma = 0.5, L = 5):
     # input:
@@ -27,34 +57,30 @@ def classical_subset_simulation(N, y_L = -3.8, p0 = 0.1, gamma = 0.5, L = 5):
     G_l = G + kappa * gamma
     
     # Compute the probability threshold
-    c_l = sorted(G_l)[N0]
+    c_l = sorted(G_l)[N0-1]
     # print("The probability threshold for level 1 is", c_l)
     
     if c_l <= y_L:
         mask = G_l <= y_L
         return np.sum(mask) / N
     
-    mask = G_l < c_l
+    mask = G_l <= c_l
     G_l = G_l[mask][:N0]
     
     for l in range(2, L):
-        # G_l = Generate_G_l(G_l, N, l, c_l, gamma = gamma)
-        # G_l = modified_metropolis_hastings(G_l, N, l, c_l, gamma = gamma)
         G_l = sample_new_G(G_l, N, l, c_l, gamma = gamma)
         
-        c_l = sorted(G_l)[N0]
+        c_l = sorted(G_l)[N0-1]
         # print("The probability threshold for level", l, "is", c_l)
         
         if c_l <= y_L:
             mask = G_l <= y_L
             return p0 ** (l-1) * np.sum(mask) / N
         
-        mask = G_l < c_l
+        mask = G_l <= c_l
         G_l = G_l[mask][:N0]
         
-    # G_l= Generate_G_l(G_l, N, L, c_l, gamma = gamma)
-    # G_l = modified_metropolis_hastings(G_l, N, l, c_l, gamma = gamma)
-    G_l = sample_new_G(G_l, N, l, c_l, gamma = gamma)
+    G_l = sample_new_G(G_l, N, L, c_l, gamma = gamma)
     mask = G_l <= y_L
     # print("The number of samples in the failure domain is", np.sum(mask))
     return p0 ** (L-1) * np.sum(mask) / N
@@ -66,13 +92,13 @@ if __name__ == "__main__":
     L = 5  # Total number of levels
     y_L = -3.8  # Failure threshold
     
-    np.random.seed(4)
+    np.random.seed(1)
     p_f = classical_subset_simulation(N, p0=p_0, L=L)
     print("The failure p_fability is {:.2e}".format(p_f))
     
     from confidence_interval import bootstrap_confidence_interval
 
-    failure_probabilities = [classical_subset_simulation(N, p0=p_0, L=L) for _ in range(1000)]
+    failure_probabilities = [classical_subset_simulation(N, p0=p_0, L=L) for _ in range(100)]
     # print("Failure probabilities:", failure_probabilities[0:10])
 
     # Calculate 95% confidence interval using bootstrap method
