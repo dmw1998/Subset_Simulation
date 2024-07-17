@@ -2,19 +2,23 @@ import numpy as np
 import time
 import matplotlib.pyplot as plt
 
+def k(w):
+    return np.random.uniform(-1, 1)
+
 def generate_samples(w, G, N, gamma, c, l, burn_in=0):
     N0 = len(w)
     L_b = burn_in * N0
     for i in range(N + (burn_in - 1) * N0):
         w_new = 0.8 * w[i] + np.sqrt(1 - 0.8 ** 2) * np.random.normal(0, 1)
-        # kappa = np.random.uniform(-1, 1)
-        kappa = np.random.choice([-1, 1])
+        kappa = k(w_new)
+        add_term = kappa * gamma
         tol = gamma
-        G_new = w_new + kappa * gamma
+        G_new = w_new + add_term
         for j in range(2, l):
             if tol >= np.abs(G_new - c):
                 tol = gamma ** j
-                G_new = w_new + kappa * gamma ** j
+                add_term *= gamma
+                G_new = w_new + add_term
             else:
                 break
             
@@ -33,11 +37,10 @@ def mle_sr(gamma, y, p_0, N, L, burn_in):
     
     l = 1
     w = np.random.normal(0, 1, N)
-    # kappa = np.random.uniform(-1, 1, N)
-    kappa = np.random.choice([-1, 1], N)
+    kappa = np.array([k(g) for g in w])
     G = w + kappa * gamma
     
-    c_1 = np.sort(G)[N0]
+    c_1 = np.sort(G)[N0-1]
     # print("c_ 1", c_1)
     
     # For l = 2, no burn-in
@@ -47,11 +50,11 @@ def mle_sr(gamma, y, p_0, N, L, burn_in):
     
     w, G = generate_samples(w, G, N, gamma, c_1, 2)
     
-    c_2 = np.sort(G)[N0]
+    c_2 = np.sort(G)[N0-1]
     # print("c_ 2", c_2)
     _, G_2 = generate_samples(w, G, N, gamma, c_2, 2, burn_in)
     
-    mask = G_2 < c_1
+    mask = G_2 <= c_1
     denominator = np.mean(mask)
     
     # For l > 2, burn-in
@@ -59,7 +62,7 @@ def mle_sr(gamma, y, p_0, N, L, burn_in):
     for l in range(3,L):
         c_l_1 = c_l
         w, G = generate_samples(w, G, N, gamma, c_l, l, burn_in)
-        c_l = np.sort(G)[N0]
+        c_l = np.sort(G)[N0-1]
         # print("c_",l, ":", c_l)
         
         if c_l <= y:
@@ -73,7 +76,7 @@ def mle_sr(gamma, y, p_0, N, L, burn_in):
         
         _, G_l = generate_samples(w, G, N, gamma, c_l, l, burn_in)
         
-        mask = G_l < c_l_1
+        mask = G_l <= c_l_1
         denominator *= np.mean(mask)
         
     # For l = L
@@ -99,9 +102,9 @@ if __name__ == "__main__":
     y = -3.8
     p_0 = 0.1
     N = 1000
-    burn_in = 15
+    burn_in = 10
     
-    np.random.seed(0)
+    np.random.seed(2)
     start = time.time()
     failure_probabilities = [mle_sr(gamma, y, p_0, N, L, burn_in) for _ in range(1000)]
     print("Time: ", time.time() - start)
