@@ -52,7 +52,7 @@ def mle_sr(gamma, y, p_0, N, L, burn_in):
     
     c_2 = np.sort(G)[N0-1]
     # print("c_ 2", c_2)
-    _, G_2 = generate_samples(w, G, N, gamma, c_2, 2, burn_in)
+    _, G_2 = generate_samples(w, G, N, gamma, c_2, 2)
     
     mask = G_2 <= c_1
     denominator = np.mean(mask)
