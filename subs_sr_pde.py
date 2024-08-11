@@ -15,3 +15,5 @@ def solving_pde(theta, l):
     # output:
     # u_h: the solution of the PDE
 
+    import os
+    os.environ["PETSC_OPTIONS"] = "-log_view ascii:out.log"
