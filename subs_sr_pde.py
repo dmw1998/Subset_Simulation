@@ -88,3 +88,113 @@ def solving_pde(theta, l):
     
     return u_h(1)
     
+# Sampling the parameter theta follows the Gaussian distribution
+# Modified MH algorithm
+def generate_samples(theta, G, N, gamma, y, l, burn_in=0):
+    # input:
+    # theta: the initial parameter
+    # G: the initial QoI
+    # N: the number of samples
+    # gamma: the step size
+    # y: the threshold
+    # l: the current level
+    # burn_in: the burn-in period
+
+    # output:
+    # theta: the generated samples
+    # G: the corresponding QoI
+    
+    N0 = len(theta)
+    L_b = burn_in * N0
+    for i in range(N + (burn_in - 1) * N0):
+        theta_new = 0.8 * theta[i] + np.sqrt(1 - 0.8 ** 2) * np.random.normal(0, 1)
+        G_new = solving_pde(theta_new, 0)
+        tol = 1
+        for j in range(1, l):
+            if tol >= np.abs(G_new - y):
+                tol *= gamma
+                G_new = solving_pde(theta_new, j)
+            else:
+                break
+            
+        if G_new <= y:
+            theta = np.append(theta, theta_new)
+            G = np.append(G, G_new)
+        else:
+            theta = np.append(theta, theta[i])
+            G = np.append(G, G[i])
+            
+    return theta[L_b:], G[L_b:]
+
+# Apply the subset simulation method with selective refinement strategy to the PDE model.
+def mle_sr(gamma, y, p_0, N, L, burn_in):
+    
+    N0 = int(p_0 * N)
+    
+    l = 0
+    thetas = np.random.normal(0, 1, N)
+    G = np.array([solving_pde(thetas[i], l) for i in range(N)])
+    
+    c_1 = np.sort(G)[N0-1]
+    
+    cost = N      # The times of solving the PDE
+    
+    # For l = 2, no burn-in
+    mask = G <= c_1
+    thetas = thetas[mask][:N0]
+    G = G[mask][:N0]
+    
+    thetas, G = generate_samples(thetas, G, N, gamma, c_1, 2)
+    
+    cost += N - N0
+    
+    c_2 = np.sort(G)[N0-1]
+    _, G_2 = generate_samples(thetas, G, N, gamma, c_2, 2)
+    
+    cost += N - N0
+    
+    mask = G_2 <= c_1
+    denominator = np.mean(mask)
+    
+    # For l > 2, burn-in
+    c_l = c_2
+    for l in range(3,L):
+        c_l_1 = c_l
+        thetas, G = generate_samples(thetas, G, N, gamma, c_l, l, burn_in)
+        cost += N + (burn_in - 1) * N0
+        c_l = np.sort(G)[N0-1]
+        
+        if c_l <= y:
+            mask = G <= y
+            failure_probability = p_0 ** (l-1) * np.mean(mask) / denominator
+            return failure_probability, cost
+        
+        mask = G <= c_l
+        thetas = thetas[mask][:N0]
+        G = G[mask][:N0]
+        
+        _, G_l = generate_samples(thetas, G, N, gamma, c_l, l, burn_in)
+        cost += N + (burn_in - 1) * N0
+        
+        mask = G_l <= c_l_1
+        denominator *= np.mean(mask)
+        
+    # For l = L
+    c_L_1 = c_l
+    thetas, G = generate_samples(thetas, G, N, gamma, c_l, L, burn_in)
+    cost += N + (burn_in - 1) * N0
+    
+    mask = G <= y
+    thetas = thetas[mask]
+    G = G[mask]
+    p_L = np.mean(mask)
+    
+    _, G_L = generate_samples(thetas, G, N, gamma, y, L, burn_in)
+    cost += N + (burn_in - 1) * N0
+    
+    mask = G_L < c_L_1
+    denominator *= np.mean(mask)
+    
+    failure_probability = p_0 ** (L-1) * p_L / denominator
+    
+    return failure_probability, cost
