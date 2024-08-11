@@ -19,13 +19,6 @@ def kl_expan(thetas):
     # Define the spatial domain
     x = np.linspace(0, 1, 1000)
     
-    # Define the KL eigenvalues and eigenfunctions for the exponential-type correlation function
-    # def eigenvalue(m):
-    #     return 0.02 / np.pi ** 2 / (m + 0.5) ** 2
-    
-    # def eigenfunction(m, x):
-    #     return np.sqrt(2) * (np.sin((m + 0.5) * np.pi * x) + np.cos((m + 0.5) * np.pi * x))
-    
     beta = 1 / 0.01
     
     def eigenvalue(m):
@@ -37,11 +30,6 @@ def kl_expan(thetas):
         A = np.sqrt(2 * w**2 / (2*beta + w**2 + beta**2))
         B = np.sqrt(2 * beta**2 / (2*beta + w**2 + beta**2))
         return A*np.cos(w*x) + B*np.sin(w*x)
-    
-    # p = 0
-    # for m in range(M):
-    #     p += np.sqrt(eigenvalue(m+1)) * eigenfunction(m+1,x)
-    #     plt.plot(x, p)
     
     # Compute the mean and standard deviation
     mu = -0.5 * np.log(1.01)
@@ -62,7 +50,7 @@ def solving_pde(theta, l):
     # l: the level -- related to mesh size
 
     # output:
-    # u_h: the solution of the PDE
+    # u_h(1): the QoI on level l
 
     import os
     os.environ["PETSC_OPTIONS"] = "-log_view ascii:out.log"
@@ -99,3 +87,4 @@ def solving_pde(theta, l):
     solve(a_form == L, u_h, bc)
     
     return u_h(1)
+    
