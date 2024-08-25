@@ -7,6 +7,40 @@ import matplotlib.pyplot as plt
 from genrate_y_l import y_l
 from Generate_G_l import *
 
+def k(w):
+    # return 0.5 if -1 <= w <= 1 else 0
+    # return np.random.choice([-1, 1])
+    return np.random.uniform(-1, 1)
+    # return 0.1
+
+def sample_new_G(G_l, N, l, c_l, gamma = 0.5):
+    # input:
+    # G_l: samples in failure domain
+    
+    # output:
+    # G_l: new samples for next level
+    
+    N0 = len(G_l)
+    
+    if N0 == 0:
+        G_l = np.random.normal(0, 1, N)
+        N0 = 1
+    
+    for i in range(N - N0):
+        # Propose a new sample for G ~ N(0,1)
+        G_new = 0.8 * G_l[i] + np.sqrt(1 - 0.8 ** 2) * np.random.normal(0, 1)
+        # Propose a new noise for kappa ~ U({-1, 1})
+        kappa_new = k(G_new)
+        # Compute the new G_l
+        G_l_new = G_new + kappa_new * gamma ** l
+        
+        if G_l_new <= c_l:
+            G_l = np.append(G_l, G_l_new)
+        else:
+            G_l = np.append(G_l, G_l[i])
+            
+    return G_l
+
 def rRMSE(p_hat, N):
     # input:
     # p_hat: the estimated probability of failure
@@ -97,7 +131,7 @@ if __name__ == "__main__":
     gamma = 0.5
     y_L = -3.8
     
-    # np.random.seed(0)
+    np.random.seed(0)
     start = time.time()
     p_f, cost = adaptive_multilevel_subset_simulation(L, gamma, y_L)
     print("The failure probability is {:.2e}".format(p_f))

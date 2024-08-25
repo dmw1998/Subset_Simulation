@@ -7,14 +7,14 @@ from fenics import *
 # We need to write a new method. Combine the subset simulation and the selective refinement strategy.
 
 # Computing the coefficient for the pde
-def kl_expan(thetas):
+def kl_expan(theta):
     # input:
-    # thetas: a numpy array of length M
+    # theta: a numpy array of length M
     
     # output:
     # a: a numpy array of length n
     
-    M = len(thetas)
+    M = len(theta)
     
     # Define the spatial domain
     x = np.linspace(0, 1, 1000)
@@ -36,7 +36,7 @@ def kl_expan(thetas):
     sigma = np.sqrt(np.log(1.01))
     
     # Compute the log-normal random field log(a(x))
-    log_a_x = mu + sigma * sum(np.sqrt(eigenvalue(m+1)) * eigenfunction(m+1, x) * thetas[m] for m in range(M))
+    log_a_x = mu + sigma * sum(np.sqrt(eigenvalue(m+1)) * eigenfunction(m+1, x) * theta[m] for m in range(M))
 
     # Convert to the actual random field a(x)
     a_x = np.exp(log_a_x)
@@ -86,7 +86,35 @@ def solving_pde(theta, l):
     set_log_level(LogLevel.ERROR)  # Suppress the FEniCS log messages
     solve(a_form == L, u_h, bc)
     
-    return u_h(1)
+    return 0.535 - u_h(1)
+
+def compute_cl(G, thetas_ls, N, p0, l, L):
+    # input:
+    # G: approximated IoQ
+    # thetas_ls: list of thetas
+    # N: number of samples
+    # p0: failure probability
+    # l: current level
+    # L: finest level
+    
+    # output:
+    # G, thetas_ls: updated G and thetas_ls
+    # c_l: failure level
+    
+    sorted_indices = sorted(range(N), key=lambda k: G[k])
+    sorted_G = [G[i] for i in sorted_indices]
+    sorted_theta_ls = [thetas_ls[i] for i in sorted_indices]
+    
+    N0 = int(p0 * N)
+    c_l = sorted_G[N0-1]
+    if c_l < 0 or l == L:
+        # When we reach the finest level
+        G = [g for g in G if g < 0]
+    else:
+        G = sorted_G[:N0]
+        thetas_ls = sorted_theta_ls[:N0]
+    
+    return G, thetas_ls, c_l
     
 # Sampling the parameter theta follows the Gaussian distribution
 # Modified MH algorithm
@@ -132,17 +160,14 @@ def mle_sr(gamma, y, p_0, N, L, burn_in):
     N0 = int(p_0 * N)
     
     l = 0
-    thetas = np.random.normal(0, 1, N)
-    G = np.array([solving_pde(thetas[i], l) for i in range(N)])
-    
-    c_1 = np.sort(G)[N0-1]
+    thetas = [np.random.normal(0, 1, 150) for _ in range(N)]
+    G = [solving_pde(theta, l) for theta in thetas]
     
     cost = N      # The times of solving the PDE
     
     # For l = 2, no burn-in
-    mask = G <= c_1
-    thetas = thetas[mask][:N0]
-    G = G[mask][:N0]
+    G, thetas, c_1 = compute_cl(G, thetas, N, p_0, 0, L)
+    print('c_2 = ', c_1)
     
     thetas, G = generate_samples(thetas, G, N, gamma, c_1, 2)
     
@@ -198,3 +223,14 @@ def mle_sr(gamma, y, p_0, N, L, burn_in):
     failure_probability = p_0 ** (L-1) * p_L / denominator
     
     return failure_probability, cost
+
+if __name__ == "__main__":
+    L = 5
+    gamma = 0.5
+    y = 0
+    p_0 = 0.1
+    N = 100
+    burn_in = 0
+    failure_probability, cost = mle_sr(gamma, y, p_0, N, L, burn_in)
+    print("The failure probability is: ", failure_probability)
+    print("The cost is: ", cost)
