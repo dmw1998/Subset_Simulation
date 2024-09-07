@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 def cost(N, p0, L):
     c = 2*N
     for l in range(1, L):
-        c += (10 + l) * N * p0
+        c += (9 + l) * N * p0
     
     return c
 
@@ -27,7 +27,7 @@ def sample_new_G(G_l, N, l, c_l, gamma = 0.5):
     
     for i in range(N - N0):
         # Propose a new sample for G ~ N(0,1)
-        # Computational cost: 7
+        # Computational cost: 6
         G_new = 0.4 * G_l[i] + np.sqrt(1 - 0.4 ** 2) * np.random.normal(0, 1)
         # Add noise
         kappa_new = np.random.uniform(-1, 1)
@@ -40,7 +40,7 @@ def sample_new_G(G_l, N, l, c_l, gamma = 0.5):
         else:
             G_l = np.append(G_l, G_l[i])
             
-    # Computational cost in total: (10 + l) * N0
+    # Computational cost in total: (9 + l) * N0
             
     return G_l
 
@@ -98,7 +98,7 @@ if __name__ == "__main__":
     
     cost_list = []
     err_list = []
-    for N in [100, 400, 800, 1000, 1600                                              ]:
+    for N in [100, 1000, 1600]:
         np.random.seed(0)
         print("Number of samples per level:", N)
         failure_probabilities = []
@@ -121,8 +121,9 @@ if __name__ == "__main__":
     x = np.linspace(0.01, 0.5, 100)
     
     plt.figure(figsize=(8, 6))
-    plt.loglog(err_list, cost_list, marker='o')
-    plt.loglog(x, 500 * x ** (-1), 'r--',  label=r'O($\epsilon^{-2}$)')
+    plt.loglog(err_list, cost_list)
+    # plt.loglog(x, 10 * x ** (-2), 'b--',  label=r'O($\epsilon^{-2}$)')
+    plt.loglog(x, 380 * x ** (-1), 'r--',  label=r'O($\epsilon^{-2}$)')
     plt.xlabel('Relative Error')
     plt.ylabel('Cost')
     plt.title('Classical Subset Simulation')
