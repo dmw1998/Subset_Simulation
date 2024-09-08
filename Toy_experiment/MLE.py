@@ -131,7 +131,6 @@ if __name__ == "__main__":
     
     # np.random.seed(0)
     for N in [100, 1000, 1600, 3500, 4000]:
-    # for N in [4000, 5000, 6000, 7000, 8000, 9000, 10000]:
         print("N = ", N)
         np.random.seed(0)
         failure_probabilities = []
@@ -154,6 +153,7 @@ if __name__ == "__main__":
     plt.loglog(x, 530 * x ** (-2), 'r--',  label=r'O($\epsilon^{-2}$)')
     plt.xlabel('Relative Error')
     plt.ylabel('Cost')
+    plt.title('Multilevel Estimator for Toy Experiment')
     plt.legend()
     plt.show()
     
