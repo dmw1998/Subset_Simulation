@@ -8,18 +8,19 @@ def generate_samples(w, G, N, gamma, c, l, burn_in=0):
     cost = 0
     for i in range(N + (burn_in - 1) * N0):
         w_new = 0.8 * w[i] + np.sqrt(1 - 0.8 ** 2) * np.random.normal(0, 1)
-        cost += 7
+        # cost += 7
         kappa = np.random.uniform(-1, 1)
         add_term = kappa * gamma
         tol = gamma
         G_new = w_new + add_term
-        cost += 2
+        # cost += 2
+        cost += gamma ** (-2)
         for j in range(2, l):
             if tol >= np.abs(G_new - c):
                 tol *= gamma
                 add_term *= gamma
                 G_new = w_new + add_term
-                cost += 3
+                cost += gamma ** (-2 * j)
             else:
                 break
             
@@ -29,7 +30,7 @@ def generate_samples(w, G, N, gamma, c, l, burn_in=0):
         else:
             w = np.append(w, w[i])
             G = np.append(G, G[i])
-        cost += 1
+        # cost += 1
             
     return w[L_b:], G[L_b:], cost
 
@@ -41,11 +42,9 @@ def mle_sr(gamma, y, p_0, N, L, burn_in):
     w = np.random.normal(0, 1, N)
     kappa = np.random.uniform(-1, 1, N)
     G = w + kappa * gamma
-    cost = 2 * N
+    cost = N * gamma ** (-2)
     
     c_1 = np.sort(G)[N0-1]
-    
-    cost = N
     
     # For l = 2, no burn-in
     mask = G <= c_1
@@ -124,24 +123,27 @@ if __name__ == "__main__":
     
     cost_list = []
     err_list = []
-    for N in [80, 100, 500, 1000, 3000]:
+    for N in [80, 100, 500, 1000, 3000, 5000, 10000]:
         print("N: ", N)
         np.random.seed(0)
         results = [mle_sr(gamma, y, p_0, N, L, burn_in) for _ in range(100)]
         failure_probabilities, costs = zip(*results)
+        np.save("MLE_sr_failure_probabilities_N_{}.npy".format(N), failure_probabilities)
         ave = np.mean(failure_probabilities)
         print("The average probability of failure is: {:.2e}".format(ave))
         total_cost = np.mean(costs)
-        print("The mean cost: ", total_cost)
+        np.save("MLE_sr_costs_N_{}.npy".format(N), costs)
+        print("The mean cost: {:.2e}".format(total_cost))
         cost_list.append(total_cost)
-        err = np.abs(ave - 7.23e-05) / 7.23e-05
-        print("The relative error: {:.2e}".format(err))
+        err = 1/7.23e-5*np.sqrt(np.mean((np.array(failure_probabilities) - 7.23e-05)**2))
+        np.save("MLE_sr_relative_error_N_{}.npy".format(N), err)
+        print("The relative error: {:.2e}\n".format(err))
         err_list.append(err)
         
-    x = np.linspace(1e-3, 1e-1, 100)
+    x = np.linspace(1e-2, 1, 100)
     plt.figure(figsize=(8, 6))
     plt.loglog(err_list, cost_list, marker='o')
-    plt.plot(x, 600 * x ** (-1), 'r--', label=r'O($\epsilon^{-1}$)')
+    plt.plot(x, 50000 * x ** (-2), 'r--', label=r'O($\epsilon^{-2}$)')
     plt.xlabel('Relative Error')
     plt.ylabel('Cost')
     plt.title('MLE_sr')
