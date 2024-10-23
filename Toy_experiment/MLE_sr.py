@@ -123,7 +123,7 @@ if __name__ == "__main__":
     
     cost_list = []
     err_list = []
-    for N in [80, 100, 500, 1000, 3000, 5000, 10000]:
+    for N in [80, 100, 500, 1000, 3000, 5000, 10000, 50000, 100000]:
         print("N: ", N)
         np.random.seed(0)
         results = [mle_sr(gamma, y, p_0, N, L, burn_in) for _ in range(100)]
