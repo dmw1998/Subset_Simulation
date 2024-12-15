@@ -61,7 +61,7 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
     from scipy.stats import linregress
     
-    np.random.seed(0)
+    np.random.seed(6)
     levels = range(1, 12)
     n_grids = 2**np.array(levels)
     h = 1 / n_grids
@@ -96,14 +96,14 @@ if __name__ == "__main__":
         intercepts = np.append(intercepts, intercept)
         
         # Plot the errors
-        plt.loglog(h, errors, 'o-', color = 'tab:purple', alpha=seed/5000)
-        
+        plt.loglog(h, errors, 'o-', color = 'tab:purple', alpha=seed/2000)
+            
     # Compute the average convergence rate
     avg_slope = np.mean(slopes)
-    avg_intercept = np.mean(intercepts)
-    print("Average slope: {:.2f}, C: {:.5f}".format(avg_slope, np.exp(avg_intercept)))
+    max_intercept = np.max(intercepts)
+    print("Average slope: {:.2f}, C: {:.5f}".format(avg_slope, np.exp(max_intercept)))
         
-    plt.plot(h[5:], np.exp(avg_intercept) * h[5:]**avg_slope, 'b-', label='$C h^{%.2f}$' % avg_slope)
+    plt.plot(h[5:], np.exp(max_intercept) * h[5:]**avg_slope, 'b-', label='${:.2f} h^{{{:.2f}}}$'.format(np.exp(max_intercept), avg_slope))
     plt.loglog(h, h**2, '--', label='$h^2$')
     plt.loglog(h, h, '--', label='$h$')
     plt.xlabel('h')
