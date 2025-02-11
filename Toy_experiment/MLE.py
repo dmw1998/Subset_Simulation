@@ -3,6 +3,15 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+def rRMSE(p_hat):
+    p_hat = np.array(p_hat)
+    
+    difference = p_hat - 7.23e-05
+    
+    expaction = np.mean(difference ** 2)
+    
+    return np.sqrt(expaction) / 7.23e-05
+
 def sample_new_G(G_l, N, l, c_l, gamma = 0.5):
     # input:
     # G_l: samples in failure domain
@@ -39,22 +48,21 @@ def mle(N, L_b, y_L = -3.8, p0 = 0.1, gamma = 0.5, L = 5):
     # L: total number of levels
     
     N0 = int(N * p0)
-    cost = 0
     
     # Initialization, l= 1
     G = np.random.normal(0, 1, N)
     kappa = np.random.uniform(-1, 1, N)
     G_l = G + kappa * gamma
-    cost += 2 * N
+    cost = N * gamma ** (-2)
     
     # Compute the probability threshold
-    c_l = sorted(G_l)[int(N0)-1]
+    c_l = sorted(G_l)[N0-1]
     # print("The probability threshold for level 1 is", c_l)
     
     if c_l <= y_L:
         mask = G_l <= y_L
         # print("left at level 1")
-        return np.sum(mask) / N
+        return np.mean(mask) / N, cost
     
     mask = G_l <= c_l
     G_l = G_l[mask][:N0]
@@ -63,22 +71,22 @@ def mle(N, L_b, y_L = -3.8, p0 = 0.1, gamma = 0.5, L = 5):
     
     # level 2, no burn-in
     G_l = sample_new_G(G_l, N, 2, c_l, gamma = gamma)
-    cost += 10 * (N - N0)
+    cost += (N - N0) * gamma ** (-4)
     c_l_1 = c_l
     
-    c_l = sorted(G_l)[int(N0)-1]
+    c_l = sorted(G_l)[N0-1]
     # print("The probability threshold for level 2 is", c_l)
     
     if c_l <= y_L:
         # print("left at level 2")
         mask = G_l <= y_L
-        return p0 * np.sum(mask) / N
+        return p0 * np.mean(mask) / dinominator, cost
     
     mask = G_l <= c_l
     G_l = G_l[mask][:N0]
     
     G_l_1 = sample_new_G(G_l, N, 2, c_l, gamma = gamma)
-    cost += 10 * (N - N0)
+    cost += (N - N0) * gamma ** (-4)
     mask = G_l_1 <= c_l_1
     dinominator *= np.mean(mask)
     # print("The denominator for level 2 is", dinominator)
@@ -87,12 +95,12 @@ def mle(N, L_b, y_L = -3.8, p0 = 0.1, gamma = 0.5, L = 5):
     N += L_b * N0
     for l in range(3, L):
         G_l = sample_new_G(G_l, N, l, c_l, gamma = gamma)
-        cost += (8 + l) * (N - N0)
+        cost += (N - N0) * gamma ** (-2 * l)
         # drop the first L_b samples in each Markov chain
         G_l = G_l[int(N0*L_b):]
         c_l_1 = c_l
         
-        c_l = sorted(G_l)[int(N0)]
+        c_l = sorted(G_l)[N0]
         # print("The probability threshold for level", l, "is", c_l)
         
         if c_l <= y_L:
@@ -104,7 +112,7 @@ def mle(N, L_b, y_L = -3.8, p0 = 0.1, gamma = 0.5, L = 5):
         G_l = G_l[mask][:N0]
         
         G_l_1 = sample_new_G(G_l, N, l, c_l, gamma = gamma)
-        cost += (8 + l) * (N - N0)
+        cost += (N - N0) * gamma ** (-2 * l)
         # drop the first L_b samples in each Markov chain
         G_l_1 = G_l_1[int(N0*L_b):]
         mask = G_l_1 <= c_l_1
@@ -112,13 +120,13 @@ def mle(N, L_b, y_L = -3.8, p0 = 0.1, gamma = 0.5, L = 5):
         # print("The denominator for level", l, "is", dinominator)
         
     G_l = sample_new_G(G_l, N, L, c_l, gamma = gamma)
-    cost += (8 + L) * (N - N0)
+    cost += (N - N0) * gamma ** (-2 * L)
     # drop the first L_b samples in each Markov chain
     G_l = G_l[int(N0*L_b):]
     mask = G_l <= y_L
     # print("reach the last level")
     
-    return p0 ** (L-1) * np.sum(mask) / N / dinominator, cost
+    return p0 ** (L-1) * np.mean(mask) / dinominator, cost
 
 if __name__ == "__main__":
     N = 1000  # Total number of samples per level
@@ -129,28 +137,32 @@ if __name__ == "__main__":
     err_list = []
     cost_list = []
     
-    # np.random.seed(0)
-    for N in [100, 1000, 1600, 3500, 4000]:
+    np.random.seed(23)
+    for N in [500, 1000, 1500, 3500, 7000, 100000, 500000, 1000000]:
         print("N = ", N)
-        np.random.seed(0)
+        # np.random.seed(0)
         failure_probabilities = []
         cost = []
         for i in range(100):
-            p_f, c = mle(N, 1, y_L=y, p0=p_0, L=L)
+            p_f, c = mle(N, 5, y_L=y, p0=p_0, L=L)
             failure_probabilities.append(p_f)
             cost.append(c)
             
         p = np.mean(failure_probabilities)
         print("The failure probability is {:.2e}".format(p))
-        err = abs(p - 7.23e-05) / 7.23e-05
-        print("The relative error is {:.2e}".format(err))
-        err_list.append(err)
         cost_list.append(np.mean(cost))
+        print("The cost is {:.2e}".format(np.mean(cost)))
+        err = rRMSE(failure_probabilities)
+        print("The relative error is {:.2e}\n".format(err))
+        err_list.append(err)
         
+    np.save("MLE_cost.npy", cost_list)
+    np.save("MLE_error.npy", err_list)
+    
     x = np.linspace(3e-2, 3e-1, 100)
     plt.figure(figsize=(8, 6))
     plt.loglog(err_list, cost_list, 'o-')
-    plt.loglog(x, 530 * x ** (-2), 'r--',  label=r'O($\epsilon^{-2}$)')
+    plt.loglog(x, 1000000 * x ** (-2), 'r--',  label=r'O($\epsilon^{-2}$)')
     plt.xlabel('Relative Error')
     plt.ylabel('Cost')
     plt.title('Multilevel Estimator for Toy Experiment')

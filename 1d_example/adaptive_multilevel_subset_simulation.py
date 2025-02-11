@@ -26,10 +26,12 @@ def adaptive_multilevel_subset_simulation(M, u_max, n_grid, gamma, corr_coeff = 
     # G: approximated IoQ
     
     # The sequence of the threshold values
-    y = y_l(L, gamma)
+    # y = y_l(L+1, gamma)
+    y = [0.026, 0.018, 0.012, 0.007, 0.0024, 0]
         
-    # print("y: ", y)
-    # print(" ")
+    print("y: ", y)
+    print(" ")
+    sample_numbers = np.zeros(L)
     
     i = 0
     N = 0
@@ -44,7 +46,7 @@ def adaptive_multilevel_subset_simulation(M, u_max, n_grid, gamma, corr_coeff = 
         u_1 = IoQ(kl_expan(theta), n_grid)
         g = u_max - u_1
         G.append(g)
-        print("g: ", g)
+        # print("g: ", g)
         i += 1
         N += 1
         # time.sleep(1)
@@ -58,38 +60,38 @@ def adaptive_multilevel_subset_simulation(M, u_max, n_grid, gamma, corr_coeff = 
             # for the independent random variables
             # correlation factor is 0
             delta = rRMSE(n/N, 0, N)
-            print("delta: ", delta)
+            # print("delta: ", delta)
             # time.sleep(1)
             
     p_f = n / N
     print("p_f: ", p_f)
-    
+    sample_numbers[0] = N
             
     for l in range(1, L):
-        i = 0
-        N = 0
-        n = 0
         print(" ")
         print("y_", l, ": ", y[l])
         
-        ind = i_ls[0]
+        ind = i_ls[0]-1
         theta0 = theta_ls[ind]        # initial state theta_{l,0} = theta_{l-1,i0}
                                     # where i0 is the first index of the failure sample
-        
+                
+        i_ls = []
         if G[ind] < y[l]:
-            # if g is in the failure domain F_{l+1}
-            p_l = 1
-            # autocorr = compute_autocorrelation_multidimensional(theta_ls)
-            delta = rRMSE(p_l, 0, N)
-            # delta = rRMSE(p_l, 0, 1)
-            print("delta: ", delta)
-            
             # initialize the list of the samples and the approximated IoQ
             # theta0 is in F_{l+1}, the first sample in the failure domain
             theta_ls = [theta0]
             G = [G[0]]
             N = 1
             n = 0
+            i = 1
+            i_ls.append(i)
+            
+            # if g is in the failure domain F_{l+1}
+            p_l = 1
+            # autocorr = compute_autocorrelation_multidimensional(theta_ls)
+            delta = rRMSE(p_l, 0, N)
+            # delta = rRMSE(p_l, 0, 1)
+            print("delta: ", delta)
             
         else:
             # if g is not in falure domain F_{l+1}
@@ -105,15 +107,15 @@ def adaptive_multilevel_subset_simulation(M, u_max, n_grid, gamma, corr_coeff = 
             G = [g]
             N = 1
             n = 0
-        
-        i_ls = []
+            i = 1
+
         while delta > 10**(-4):
             # print("iteration: ", i)
-            if i > 1000:
-                break
+            # if i > 1000:
+            #     break
             
             # sampling a new theta
-            theta_c = gamma * theta0 + np.sqrt(1 - gamma**2) * np.random.randn(M)
+            theta_c = 0.8 * theta0 + np.sqrt(1 - 0.8**2) * np.random.randn(M)
             g = u_max - IoQ(kl_expan(theta_c), n_grid)
             # print("g: ", g)
             # time.sleep(1)
@@ -128,37 +130,42 @@ def adaptive_multilevel_subset_simulation(M, u_max, n_grid, gamma, corr_coeff = 
                 theta0 = theta_c
                 theta_ls.append(theta0)
                 G.append(g)
+                i_ls.append(i)
                 
             if n == 0:
                 continue
             else:
-                autocorr = compute_autocorrelation_multidimensional(theta_ls)
+                # autocorr = compute_autocorrelation_multidimensional(theta_ls)
+                # print(autocorr)
+                autocorr = 0.8
                 delta = rRMSE(n/N, autocorr, N)
                 # delta = rRMSE(n/N, 0, N)
                 # print("delta: ", delta)
         
         # print(g)
-        print("i: ", i) 
-        print("n: ", n)
-        print("N: ", N)   
+        # print("i: ", i) 
+        # print("n: ", n)
+        # print("N: ", N)   
         if n == 0:
             continue
         else: 
             p_f *= n/N
+            sample_numbers[l] = N
+            
         print("p_f: ", p_f)
-        print(" ")
         
-    return p_f
+    return p_f, sample_numbers
                 
 if __name__ == "__main__":
     M = 150
     p0 = 0.1
     u_max = 0.535
-    n_grid = 100
+    n_grid = 64
     gamma = 0.15
-    L = 5
+    L = 4
     
-    np.random.seed(0)
-    p_f = adaptive_multilevel_subset_simulation(M, u_max, n_grid, gamma, L = L)
+    np.random.seed(22)
+    p_f, cost = adaptive_multilevel_subset_simulation(M, u_max, n_grid, gamma, L = L)
     print(" ")
     print("final probability{:.2e}".format(p_f))
+    print("cost: ", cost)

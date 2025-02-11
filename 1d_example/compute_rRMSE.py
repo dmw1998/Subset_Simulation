@@ -11,4 +11,7 @@ def rRMSE(p_l, phi_l, N_l):
     # output:
     # err: relative root mean square error
     
+    if p_l == 0:
+        return 1e06
+    
     return np.sqrt( (1-p_l) * (1+phi_l) / p_l / N_l )

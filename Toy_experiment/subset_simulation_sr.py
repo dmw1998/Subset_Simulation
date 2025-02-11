@@ -4,6 +4,15 @@ import numpy as np
 import time
 import matplotlib.pyplot as plt
 
+def rRMSE(p_hat):
+    p_hat = np.array(p_hat)
+    
+    difference = p_hat - 7.23e-05
+    
+    expaction = np.mean(difference ** 2)
+    
+    return np.sqrt(expaction) / 7.23e-05
+
 def subset_simulation_sr(L, gamma, y_L, N):
     # input:
     # L: number of levels
@@ -26,7 +35,7 @@ def subset_simulation_sr(L, gamma, y_L, N):
         G = np.random.normal(0, 1, N)
         kappa = np.random.uniform(-1, 1, N)
         G_l = G + kappa * gamma
-        cost[0] = 2 * N
+        cost[0] = N * gamma ** (-2)
         
         mask = G_l <= y[0]
         # print(mask.sum())
@@ -42,10 +51,10 @@ def subset_simulation_sr(L, gamma, y_L, N):
             # print("G_l: ", G_l)
             # time.sleep(0.5)
             for i in range(N-1):
-                G_l_new = 0.4 * G_l[i] + np.sqrt(1 - 0.4 ** 2) * np.random.normal(0, 1)
+                G_l_new = 0.8 * G_l[i] + np.sqrt(1 - 0.8 ** 2) * np.random.normal(0, 1)
                 kappa_new = np.random.uniform(-1, 1)
                 G_l_new += kappa_new * (gamma ** l)
-                cost[l-1] += 8 + l
+                cost[l-1] += gamma ** (-2 * l)
                 
                 if G_l_new <= y[l-2]:
                     G_l = np.append(G_l, G_l_new)
@@ -70,8 +79,9 @@ if __name__ == "__main__":
     cost_list = []
     err_list = []
     
-    for N in [1000, 1500, 3000]:
-        np.random.seed(0)
+    np.random.seed(33)
+    for N in [500, 1000, 1500, 5000, 10000, 15000, 150000, 500000]:
+        # np.random.seed(0)
         failure_probabilities = []
         cost = []
         for _ in range(100):
@@ -79,19 +89,23 @@ if __name__ == "__main__":
             failure_probabilities.append(p_f)
             cost.append(c)
             
+        np.save("subset_simulation_sr_N_{}.npy".format(N), failure_probabilities)
         ave = np.mean(failure_probabilities)
         print("The mean of the failure probability for N = {}: {:.2e}".format(N, ave))
-        err = np.abs(ave - 7.23e-05) / 7.23e-05
-        err_list.append(err)
-        print("The relative error: {:.2e}".format(err))
         c = np.mean(cost)
         cost_list.append(c)
-        print("The average cost: {}".format(c))
+        print("The average cost: {:.2e}".format(c))
+        err = rRMSE(failure_probabilities)
+        err_list.append(err)
+        print("The relative error: {:.2e}\n".format(err))
         
-    x = np.linspace(3e-2, 4e-1, 100)
+    np.save("subset_simulation_sr_cost.npy", cost_list)
+    np.save("subset_simulation_sr_error.npy", err_list)
+    
+    x = np.linspace(1e-2, 1, 100)
     plt.figure(figsize=(8, 6))
     plt.loglog(err_list, cost_list, marker='o')
-    plt.loglog(x, 5300 * x ** (-1/2), 'r--',  label=r'O($\epsilon^{-1/2}$)')
+    plt.loglog(x, 53000 * x ** (-2) * np.log(1/x), 'r--',  label=r'O($\epsilon^{-2}log(\epsilon)$')
     plt.xlabel('Relative Error')
     plt.ylabel('Cost')
     plt.title('Subset Simulation with Selective Refinement')

@@ -20,6 +20,14 @@ def rRMSE(p_hat, N):
     
     return np.sqrt((1 - p_hat) * 1.8 / p_hat / N)
 
+    # p_hat = np.array(p_hat)
+    
+    # difference = p_hat - 7.23e-05
+    
+    # expaction = np.mean(difference ** 2)
+    
+    # return np.sqrt(expaction) / 7.23e-05
+
 def adaptive_multilevel_subset_simulation(L, gamma, y_L, tol):
     # input:
     # L: number of levels
@@ -38,7 +46,7 @@ def adaptive_multilevel_subset_simulation(L, gamma, y_L, tol):
     while err > tol:
         i += 1
         N_l += 1
-        cost[0] += 2
+        cost[0] += gamma ** (-2)
         G = np.random.normal(0, 1)
         kappa = np.random.uniform(-1, 1)
         G_l = np.append(G_l, G + kappa * gamma)
@@ -47,6 +55,10 @@ def adaptive_multilevel_subset_simulation(L, gamma, y_L, tol):
         p_hat = mask.mean()
         
         err = rRMSE(p_hat, N_l)
+        
+        # if N_l % 100 == 0:
+        #     # print("level: ", 1, "p_hat:", p_hat)
+        #     print("err: ", err)
         
     p_f = p_hat
     # print("level: ", 1, "p_hat:", p_hat)
@@ -67,12 +79,12 @@ def adaptive_multilevel_subset_simulation(L, gamma, y_L, tol):
                 G_l = np.append(G_l, G_l_new)
                 i += 1
                 N_l += 1
-                cost[l] += 9 + l
+                cost[l] += gamma ** (-2 * (l+1))
             else:
                 G_l = np.append(G_l, G_l[-1])
                 i += 1
                 N_l += 1
-                cost[l] +=  9 + l
+                cost[l] +=  gamma ** (-2 * (l+1))
                 
             mask = G_l <= y[l]
             p_hat = mask.mean()
@@ -84,6 +96,7 @@ def adaptive_multilevel_subset_simulation(L, gamma, y_L, tol):
             
         p_f *= p_hat
         # print("level: ", l+1, "p_hat:", p_hat)
+        # print("p_f: ", p_f)
         
     return p_f, cost
 
@@ -96,9 +109,12 @@ if __name__ == "__main__":
     err_list = []
     cost_list = []
 
-    for tol in [1, 0.5, 0.1, 0.05, 0.01]:
-        np.random.seed(0)
+    np.random.seed(42)
+    for tol in [0.1, 0.05, 0.01, 0.005, 0.001]:
+        # np.random.seed(0)
+        print("Tolerance: ", tol)
         total_cost = []
+        failure_probabilities = []
         # with open("adaptive_multilevel_subsest_simulation_cost.csv", "a") as file:
         for _ in range(100):
             p_f, cost = adaptive_multilevel_subset_simulation(L, gamma, y_L, tol)
@@ -114,20 +130,40 @@ if __name__ == "__main__":
         ave = np.mean(failure_probabilities)
         print("The average probability of failure is: {:.2e}".format(ave))
         
-        err = np.abs(ave - 7.23e-05) / 7.23e-05
-        print("The relative error is: {:.2e}".format(err))
+        cost = np.mean(total_cost)
+        print("The average cost is: {:.2e}".format(cost))
+        cost_list.append(cost)
+        
+        err = 1/7.23e-05*np.sqrt(np.mean((np.array(failure_probabilities) - 7.23e-05)**2))
+        print("The relative error is: {:.2e}\n".format(err))
         err_list.append(err)
         
-        cost = np.mean(total_cost)
-        print("The average cost is: ", cost)
-        cost_list.append(cost)
+    np.save("adaptive_multilevel_subset_simulation_cost.npy", cost_list)
+    np.save("adaptive_multilevel_subset_simulation_error.npy", err_list)
+        
+    # Outputs
+    # The average probability of failure is: 8.35e-04
+    # The relative error is: 1.06e+01
+    # The average cost is:  917.39
+    # The average probability of failure is: 7.19e-04
+    # The relative error is: 8.94e+00
+    # The average cost is:  2167.81
+    # The average probability of failure is: 5.13e-04
+    # The relative error is: 6.09e+00
+    # The average cost is:  46200.33
+    # The average probability of failure is: 4.06e-04
+    # The relative error is: 4.62e+00
+    # The average cost is:  185634.57
+    # The average probability of failure is: 3.43e-04
+    # The relative error is: 3.74e+00
+    # The average cost is:  4603599.37
             
     # Define the principle line
-    x = np.linspace(0.01, 0.5, 100)
+    x = np.linspace(0.01, 1, 100)
     
     plt.figure(figsize=(8, 6))
     plt.loglog(err_list, cost_list, marker='o')
-    plt.loglog(x, 500 * x ** (-2), 'r--',  label=r'O($\epsilon^{-2}$)')
+    plt.loglog(x, 300000 * x ** (-2), 'r--',  label=r'O($\epsilon^{-2}$)')
     plt.xlabel('Relative Error')
     plt.ylabel('Cost')
     plt.title('Adapter Multilevel Subset Simulation')

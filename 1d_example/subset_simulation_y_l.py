@@ -25,7 +25,11 @@ def subset_simulation_yl(N, M, u_max, n_grid, gamma, corr_coeff = 0.8, L = 5):
     # Initialize the threshold values
     # y =[0.021068347431547174, 0.013600918999687628, 0.0046197026089659365, 10e-6]
     # L = len(y)
-    y = y_l(L, gamma)
+    # y = y_l(L, gamma)
+    y = [1.3, 0.17, 0.022, 0.0025, 0]
+    
+    # Compute cost
+    sample_numbers = np.zeros(L)
     
     # Initialize the list of the approximated IoQ
     G = []
@@ -40,6 +44,8 @@ def subset_simulation_yl(N, M, u_max, n_grid, gamma, corr_coeff = 0.8, L = 5):
         g = u_max - u_1
         theta_ls.append(thetas)
         G.append(g)
+    
+    sample_numbers[0] = N
             
     theta_new = []
     G_new = []
@@ -58,6 +64,8 @@ def subset_simulation_yl(N, M, u_max, n_grid, gamma, corr_coeff = 0.8, L = 5):
         # Generate N - N0 samples for each level
         G_c, theta_c_ls = sampling_theta_list(N, G, theta_ls, y[l-1], u_max, n_grid, corr_coeff)
         
+        sample_numbers[l] = N - len(G)
+        
         theta_ls = []
         G = []
         for i in range(N):
@@ -72,6 +80,8 @@ def subset_simulation_yl(N, M, u_max, n_grid, gamma, corr_coeff = 0.8, L = 5):
             theta_ls = [theta_c_ls[-1]]
             G = [G_c[-1]]
             G_c, theta_c_ls = sampling_theta_list(N, G, theta_ls, y[l-1], u_max, n_grid, corr_coeff)
+            
+            sample_numbers[l] += N - len(G)
             
             theta_ls = []
             G = []
@@ -91,13 +101,17 @@ def subset_simulation_yl(N, M, u_max, n_grid, gamma, corr_coeff = 0.8, L = 5):
         # print("prob at", l+1, "is", len(G) / N)
         p_f *= len(G) / N
         
-    return s, p_f
+        if p_f < 8e-5 or p_f > 2.4e-4:
+            s = False
+            
+        
+    return s, p_f, sample_numbers
 
 if __name__ == "__main__":
     N = 1000
     M = 150
     u_max = 0.535
-    n_grid = 512
+    n_grid = 4
     gamma = 0.13
     corr_coeff = 0.8
     L = 5
@@ -105,41 +119,48 @@ if __name__ == "__main__":
     y = y_l(L, gamma)
     print("y: ", y)
     
-    np.random.seed(0)
-    s, p_f = subset_simulation_yl(N, M, u_max, n_grid, gamma, corr_coeff, L)
-    print("failure probability  {:.2e}".format(p_f))
+    np.random.seed(16)
+    s, p_f, cost = subset_simulation_yl(N, M, u_max, n_grid, gamma, corr_coeff, L)
+    print("failure probability {:.2e}".format(p_f))
+    print("cost: ", cost)
     s = False
-    p_f = np.zeros(500)
-    for i in range(500):
-        ind = i
+    p_f = np.zeros(100)
+    for i in range(100):
         while True:
-            s, p = subset_simulation_yl(N, M, u_max, n_grid, gamma, corr_coeff, L)
+            s, p, cost = subset_simulation_yl(N, M, u_max, n_grid, gamma, corr_coeff, L)
             # print("s", s)
             if s:
-                p_f[ind] = p
-                print("failure probability {:.2e}".format(p_f[ind]))
+                p_f[i] = p
+                print("failure probability {:.2e}".format(p_f[i]))
                 break
+            
+            # save cost in a txt file
+            with open("subset_simulation_cost.txt", "a") as f:
+                f.write(str(cost))
+                f.write("\n")
         
+    np.save("subset_simulation_yl.npy", p_f)
+    
     # p_f_mean = np.mean(p_f)
     # print("mean of failure probability {:.2e}".format(p_f_mean))
     
-    from subset_simulation import bootstrap_confidence_interval
+    # from subset_simulation import bootstrap_confidence_interval
 
-    # Calculate 95% confidence interval using bootstrap method
-    confidence_interval = bootstrap_confidence_interval(p_f, num_bootstrap_samples=100, confidence_level=0.95)
+    # # Calculate 95% confidence interval using bootstrap method
+    # confidence_interval = bootstrap_confidence_interval(p_f, num_bootstrap_samples=100, confidence_level=0.95)
 
-    print("95% confidence interval for failure probability:", confidence_interval)
+    # print("95% confidence interval for failure probability:", confidence_interval)
     
-    p_f = sorted(p_f)
-    cdf = np.arange(1, len(p_f) + 1) / len(p_f) 
+    # p_f = sorted(p_f)
+    # cdf = np.arange(1, len(p_f) + 1) / len(p_f) 
 
-    # Step 3: Plot the empirical CDF
-    plt.figure(figsize=(8, 6))
-    plt.xscale("log")
-    plt.xlim(1e-5, 1e-3)
-    plt.step(p_f, cdf, where='post')
-    plt.xlabel('Probability')
-    plt.ylabel('Empirical CDF')
-    plt.title('Empirical CDF of Probabilities')
-    plt.grid(True)
-    plt.show()
+    # # Step 3: Plot the empirical CDF
+    # plt.figure(figsize=(8, 6))
+    # plt.xscale("log")
+    # plt.xlim(1e-5, 1e-3)
+    # plt.step(p_f, cdf, where='post')
+    # plt.xlabel('Probability')
+    # plt.ylabel('Empirical CDF')
+    # plt.title('Empirical CDF of Probabilities')
+    # plt.grid(True)
+    # plt.show()

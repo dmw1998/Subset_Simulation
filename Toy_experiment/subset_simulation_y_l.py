@@ -2,7 +2,16 @@ import numpy as np
 import time
 import matplotlib.pyplot as plt
 
-from adaptive_multilevel_subset_simulation import rRMSE
+# from adaptive_multilevel_subset_simulation import rRMSE
+
+def rRMSE(p_hat):
+    p_hat = np.array(p_hat)
+    
+    difference = p_hat - 7.23e-05
+    
+    expaction = np.mean(difference ** 2)
+    
+    return np.sqrt(expaction) / 7.23e-05
 
 def sample_new_G(G_l, N, l, c_l, gamma = 0.5):
     # input:
@@ -11,22 +20,32 @@ def sample_new_G(G_l, N, l, c_l, gamma = 0.5):
     # output:
     # G_l: new samples for next level
     
+    cost = 0
     N0 = len(G_l)
     
     for i in range(N - N0):
-        # Propose a new sample for G ~ N(0,1)
-        G_new = 0.2 * G_l[i] + np.sqrt(1 - 0.2 ** 2) * np.random.normal(0, 1)
-        # Propose a new noise for kappa ~ U({-1, 1})
-        kappa_new = np.random.uniform(-1, 1)
-        # Compute the new G_l
-        G_l_new = G_new + kappa_new * gamma ** l
-        
-        if G_l_new <= c_l:
-            G_l = np.append(G_l, G_l_new)
+        w_new = 0.8 * G_l[i] + np.sqrt(1 - 0.8 ** 2) * np.random.normal(0, 1)
+        kappa = np.random.uniform(-1, 1)
+        add_term = kappa * gamma
+        tol = gamma
+        G_new = w_new + add_term
+        cost += gamma ** (-2)
+        for j in range(2, l):
+            if tol >= np.abs(G_new - c_l):
+                tol *= gamma
+                add_term *= gamma
+                G_new = w_new + add_term
+                cost += gamma ** (-2 * j)
+            else:
+                break
+            
+        if G_new <= c_l:
+            G_l = np.append(G_l, G_new)
         else:
             G_l = np.append(G_l, G_l[i])
+        cost += 1
             
-    return G_l
+    return G_l, cost
 
 def adaptive_subset_simulation_sr(L, gamma, y_L, N):
     # input:
@@ -39,76 +58,90 @@ def adaptive_subset_simulation_sr(L, gamma, y_L, N):
     # p_f: the probability of failure
     # total_cost: the total number of samples used
     
-    # To compute the sequence of failure thresholds y_l
-    y = [-1.3, -2, -2.8, -3.3, y_L]
-    # y = y_l(gamma, y_L, L)
+    p0 = 0.2
+    N0 = int(N * p0)
     
-    total_cost = 0
+    # Initialization, l= 1
+    # Computational cost: 2N
+    G = np.random.normal(0, 1, N)
+    kappa = np.random.uniform(-1, 1, N)
+    G_l = G + kappa * gamma
     
-    # To generate the samples
-    while True:
-        G = np.random.normal(0, 1, N)
-        kappa = np.random.uniform(-1, 1, N)
-        G_l = G + kappa * gamma
-        total_cost += 2 * N
+    cost = N * gamma ** (-2)
+    
+    # Compute the probability threshold
+    c_l = sorted(G_l)[N0-1]
+    # print("The probability threshold for level 1 is", c_l)
+    
+    if c_l <= y_L:
+        mask = G_l <= y_L
+        return np.mean(mask), cost
+    
+    mask = G_l <= c_l
+    G_l = G_l[mask][:N0]
+    
+    for l in range(2, L):
+        G_l, add_cost = sample_new_G(G_l, N, l, c_l, gamma = gamma)
+        cost += add_cost
         
-        mask = G_l <= y[0]
-        # print(np.mean(mask))
+        c_l = sorted(G_l)[N0-1]
+        # print("The probability threshold for level", l, "is", c_l)
         
-        if mask.sum() > 0:
-            p_f = mask.mean()
-            G_l = G_l[mask][:1]
-            break
+        if c_l <= y_L:
+            mask = G_l <= y_L
+            return p0 ** (l-1) * np.mean(mask), cost
         
-    for l in range(1, L):
-        while True:
-            total_cost += (9 + l) * (N - len(G_l))
-            G_l = sample_new_G(G_l, N, l + 1, y[l - 1], gamma)
-            
-            mask = G_l <= y[l]
-            # print(np.mean(mask))
-            
-            if mask.sum() > 0:
-                p_f *= mask.mean()
-                G_l = G_l[mask][:1]
-                break
-            else:
-                G_l = G_l[-1:]
+        mask = G_l <= c_l
+        G_l = G_l[mask][:N0]
         
-    return p_f, total_cost
+    G_l, add_cost = sample_new_G(G_l, N, L, c_l, gamma = gamma)
+    cost += add_cost
+    
+    mask = G_l <= y_L
+    # print("The number of samples in the failure domain is", np.sum(mask))
+    
+    return p0 ** (L-1) * np.mean(mask), cost
+        
 
 if __name__ == "__main__":
-    L = 5
+    L = 6
     gamma = 0.5
     y_L = -3.8
     cost_list = []
     err_list = []
     
-    for N in [500, 1000, 2000, 4000]:
-        np.random.seed(0)
-        num_simulations = 1
-        results = [adaptive_subset_simulation_sr(L, gamma, y_L, N) for _ in range(num_simulations)]
-        failure_probabilities, costs = zip(*results)
+    np.random.seed(2)
+    for N in [1000, 5000, 10000, 100000]:
+        print("Number of samples per level:", N)
+        # np.random.seed(0)
+        failure_probabilities = []
+        costs = []
+        for i in range(100):
+            # print("Simulation: ", i)
+            p_f, c = adaptive_subset_simulation_sr(L, gamma, y_L, N)
+            failure_probabilities.append(p_f)
+            costs.append(c)
         
         mean_failure_probability = np.mean(failure_probabilities)
         print("The mean of the failure probability: {:.2e}".format(mean_failure_probability))
         
         cost = np.mean(costs)
-        print("The mean of the total cost: ", cost)
+        print("The mean of the total cost: {:.2e}".format(cost))
         cost_list.append(cost)
         
-        err = np.abs(mean_failure_probability - 7.23e-05) / 7.23e-05
-        print("The relative error is: {:.2e}".format(err))
+        err = rRMSE(failure_probabilities)
+        print("The relative error is: {:.2e}\n".format(err))
         err_list.append(err)
         
-    x = np.linspace(2e-2, 1, 100)
-    plt.figure(figsize=(8, 6))
-    plt.loglog(err_list, cost_list, marker='o')
-    plt.loglog(x, 25000 * x ** (-1/2), 'r--',  label=r'O($\epsilon^{-2}$)')
-    plt.xlabel('Relative Error')
-    plt.ylabel('Cost')
-    plt.title('Adaptive Subset Simulation')
-    plt.show()
+    # x = np.linspace(2e-2, 1, 100)
+    # plt.figure(figsize=(8, 6))
+    # plt.loglog(err_list, cost_list, marker='o')
+    # plt.loglog(x, 25000 * x ** (-1/2), 'r--',  label=r'O($\epsilon^{-1/2}$)')
+    # plt.xlabel('Relative Error')
+    # plt.ylabel('Cost')
+    # plt.title('Adaptive Subset Simulation')
+    # plt.legend()
+    # plt.show()
     
     # from confidence_interval import bootstrap_confidence_interval
     

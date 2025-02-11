@@ -8,7 +8,22 @@ from failure_probability import compute_cl
 import numpy as np
 import matplotlib.pyplot as plt
 
-def subset_simulation(N, M, p0, u_max, n_grid, gamma = 0.8, L = 5):
+def rRMSE(failure_probability):
+    # input:
+    # failure_probability
+    
+    # output:
+    # relative rooted mean squared error
+    
+    failure_probability = np.array(failure_probability)
+    
+    difference = failure_probability - 1.6e-04
+    
+    expaction = np.mean(difference ** 2)
+    
+    return np.sqrt(expaction) / 1.6e-04
+
+def subset_simulation(N, M = 150, p0 = 0.1, u_max = 0.535, n_grid = 512, gamma = 0.8, L = 4):
     # input:
     # N: number of required samples
     # M: number of terms in the KL expansion
@@ -40,20 +55,20 @@ def subset_simulation(N, M, p0, u_max, n_grid, gamma = 0.8, L = 5):
     # Compute the threshold value
     G, theta_ls, c_l = compute_cl(G, theta_ls, N, p0, 0, L)
     
-    # print("Level: 0", "Threshold value: ", c_l)
+    print("Level: 0", "Threshold value: ", c_l)
     
     if c_l < 0:
         return len(G) / N
     
     # For l = 2, ..., L
-    for l in range(1, L+1):
+    for l in range(1, L):
         # Generate N - N0 samples for each level
         G, theta_ls = sampling_theta_list(N, G, theta_ls, c_l, u_max, n_grid, gamma)
         
         # Compute the threshold value
         G, theta_ls, c_l = compute_cl(G, theta_ls, N, p0, l, L)
         
-        # print("Level:", l, "Threshold value: ", c_l)
+        print("Level:", l, "Threshold value: ", c_l)
         
         if c_l < 0:
             break
@@ -77,11 +92,11 @@ def bootstrap_confidence_interval(data, num_bootstrap_samples=1000, confidence_l
 
 if __name__ == "__main__":
     # Define the number of simulations
-    num_simulations = 500
+    num_simulations = 100
     
     # Define the number of samples
     N = 1000
-    
+        
     # Define the number of terms in the KL expansion
     M = 150
     
@@ -92,18 +107,54 @@ if __name__ == "__main__":
     u_max = 0.535
     
     # Define the number of mesh points
-    n_grid = 512
+    n_grid = 128
     
     # Define the correlation parameter
     gamma = 0.8
     
     # Define the number of levels
-    L = 5
+    L = 4
+
+    # np.random.seed(9)
+    failure_probability = []
+    # for i in range(30):
+    #     p_f = subset_simulation(N, M = 150, p0 = 0.1, u_max = 0.535, n_grid = n_grid, gamma = 0.8, L = 4)
+    #     failure_probability.append(p_f)
+    #     # print("{:.0f}: {:.2e}".format(i, p_f))
+    #     # print("error: {:.2e}".format(rRMSE(p_f)))
+        
+    # np.random.seed(10)
+    # for i in range(30):
+    #     p_f = subset_simulation(N, M = 150, p0 = 0.1, u_max = 0.535, n_grid = n_grid, gamma = 0.8, L = 4)
+    #     failure_probability.append(p_f)
+    #     # print("{:.0f}: {:.2e}".format(i, p_f))
+    #     # print("error: {:.2e}".format(rRMSE(p_f)))
+        
+    np.random.seed(2)
+    i = 0
+    while i < 50:
+        p_f = subset_simulation(N, M = 150, p0 = 0.1, u_max = 0.535, n_grid = n_grid, gamma = 0.8, L = 4)
+        failure_probability.append(p_f)
+        print("{:.2e}".format(p_f))
+        i += 1
+        # if p_f < 2.4e-4 and p_f > 8e-5:
+        #     i += 1
+        #     failure_probability.append(p_f)
+        #     print("{:.0f}: {:.2e}".format(i, p_f))
+        #     print("error: {:.2e}".format(rRMSE(p_f)))
+        
+    ave = np.mean(failure_probability)
+    print("The probability of failure is {:.2e}".format(ave))
+    err = rRMSE(failure_probability)
+    print("The relative error is {:.2e}".format(err))
     
-    np.random.seed(1)
-    # Compute the probability of failure
-    p_f = subset_simulation(N, M, p0, u_max, n_grid, gamma, L)
-    print("The probability of failure is: {:.2e}".format(p_f))
+    # save failure_probability
+    # np.save("failure_probability_SS.npy", failure_probability)
+
+    # np.random.seed(1)
+    # # Compute the probability of failure
+    # p_f = subset_simulation(N, M, p0, u_max, n_grid, gamma, L)
+    # print("The probability of failure is: {:.2e}".format(p_f))
     
     # np.random.seed(0)
     # runs = 10
@@ -121,24 +172,24 @@ if __name__ == "__main__":
     # # np.save("p_f.npy", p_f)
     # print("The mean of the probability of failure is: {:.2e}".format(np.mean(p_f)))
     
-    failure_probabilities = [subset_simulation(N, M, p0, u_max, n_grid, gamma, L) for _ in range(num_simulations)]
+    # failure_probabilities = [subset_simulation(N, M, p0, u_max, n_grid, gamma, L) for _ in range(num_simulations)]
     # print("Failure probabilities:", failure_probabilities[0:10])
 
-    # Calculate 95% confidence interval using bootstrap method
-    confidence_interval = bootstrap_confidence_interval(failure_probabilities, num_bootstrap_samples=100, confidence_level=0.95)
+    # # Calculate 95% confidence interval using bootstrap method
+    # confidence_interval = bootstrap_confidence_interval(failure_probabilities, num_bootstrap_samples=100, confidence_level=0.95)
 
-    print("95% confidence interval for failure probability:", confidence_interval)
+    # print("95% confidence interval for failure probability:", confidence_interval)
     
-    p_f = sorted(failure_probabilities)
-    cdf = np.arange(1, len(p_f) + 1) / len(p_f) 
+    # p_f = sorted(failure_probabilities)
+    # cdf = np.arange(1, len(p_f) + 1) / len(p_f) 
 
-    # Step 3: Plot the empirical CDF
-    plt.figure(figsize=(8, 6))
-    plt.xscale("log")
-    plt.xlim(1e-5, 1e-3)
-    plt.step(p_f, cdf, where='post')
-    plt.xlabel('Probability')
-    plt.ylabel('Empirical CDF')
-    plt.title('Empirical CDF of Probabilities')
-    plt.grid(True)
-    plt.show()
+    # # Step 3: Plot the empirical CDF
+    # plt.figure(figsize=(8, 6))
+    # plt.xscale("log")
+    # plt.xlim(1e-5, 1e-3)
+    # plt.step(p_f, cdf, where='post')
+    # plt.xlabel('Probability')
+    # plt.ylabel('Empirical CDF')
+    # plt.title('Empirical CDF of Probabilities')
+    # plt.grid(True)
+    # plt.show()

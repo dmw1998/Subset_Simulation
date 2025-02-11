@@ -28,6 +28,15 @@ def bootstrap_confidence_interval(data, num_bootstrap_samples=1000, confidence_l
     
     return (lower_bound_95, upper_bound_95), (lower_bound_99, upper_bound_99)
 
+def rRMSE(p_hat):
+    p_hat = np.array(p_hat)
+    
+    difference = p_hat - 7.23e-05
+    
+    expaction = np.mean(difference ** 2)
+    
+    return np.sqrt(expaction) / 7.23e-05
+
 import matplotlib.pyplot as plt
 
 from Generate_G_l import *
@@ -42,12 +51,12 @@ def classical_subset_simulation(N, y_L = -3.8, p0 = 0.1, gamma = 0.5, L = 5):
     
     
     # Initialization, l= 1
-    G = np.random.normal(0, 1, N)
-    kappa = np.array([k(g) for g in G])
+    G = np.random.normal(0, 1, N) # theta
+    kappa = np.random.choice([-1, 1], N)
     G_l = G + kappa * gamma
     
     # Compute the probability threshold
-    c_l = sorted(G_l)[int(N*p0)]
+    c_l = np.percentile(G_l, 100 * p0)
     
     if c_l <= y_L:
         mask = G_l <= y_L
@@ -55,13 +64,14 @@ def classical_subset_simulation(N, y_L = -3.8, p0 = 0.1, gamma = 0.5, L = 5):
     
     mask = G_l <= c_l
     G_l = G_l[mask]
+    G = G[mask]
     
     for l in range(2, L):
         # G_l = Generate_G_l(G_l, N, l, c_l, gamma = gamma)
         # G_l = modified_metropolis_hastings(G_l, N, l, c_l, gamma = gamma)
-        G_l = sample_new_G(G_l, N, l, c_l, gamma = gamma)
+        G_l, G = Generate_G_l(G_l, G, N, l, c_l, gamma = gamma)
         
-        c_l = sorted(G_l)[int(N*p0)]
+        c_l = np.percentile(G_l, 100 * p0)
         # print("The probability threshold for level", l, "is", c_l)
         
         if c_l <= y_L:
@@ -73,7 +83,7 @@ def classical_subset_simulation(N, y_L = -3.8, p0 = 0.1, gamma = 0.5, L = 5):
         
     # G_l= Generate_G_l(G_l, N, L, c_l, gamma = gamma)
     # G_l = modified_metropolis_hastings(G_l, N, l, c_l, gamma = gamma)
-    G_l = sample_new_G(G_l, N, l, c_l, gamma = gamma)
+    G_l, G = Generate_G_l(G_l, G, N, l, c_l, gamma = gamma)
     mask = G_l <= y_L
     # print("The number of samples in the failure domain is", np.sum(mask))
     return p0 ** (L-1) * np.sum(mask) / N
@@ -89,32 +99,41 @@ if __name__ == "__main__":
     # p_f = classical_subset_simulation(N, p0=p_0, L=L)
     # print("The failure p_fability is {:.2e}".format(p_f))
     
-    failure_probabilities = [classical_subset_simulation(N, p0=p_0, L=L) for _ in range(1000)]
+    # failure_probabilities = [classical_subset_simulation(N, p0=p_0, L=L) for _ in range(1000)]
     # print("Failure probabilities:", failure_probabilities[0:10])
 
     # Calculate 95% confidence interval using bootstrap method
-    confidence_interval, ci = bootstrap_confidence_interval(failure_probabilities, num_bootstrap_samples=1000, confidence_level=0.95)
+    # confidence_interval, ci = bootstrap_confidence_interval(failure_probabilities, num_bootstrap_samples=1000, confidence_level=0.95)
 
-    print("95% confidence interval for failure probability: ({:.2e}, {:.2e})".format(confidence_interval[0], confidence_interval[1]))
+    # print("95% confidence interval for failure probability: ({:.2e}, {:.2e})".format(confidence_interval[0], confidence_interval[1]))
     
-    print("99% confidence interval for failure probability: ({:.2e}, {:.2e})".format(ci[0], ci[1]))
+    # print("99% confidence interval for failure probability: ({:.2e}, {:.2e})".format(ci[0], ci[1]))
     
-    p_f = sorted(failure_probabilities)
-    cdf = np.arange(1, len(p_f) + 1) / len(p_f) 
+    # p_f = sorted(failure_probabilities)
+    # cdf = np.arange(1, len(p_f) + 1) / len(p_f) 
 
-    # Plot the empirical CDF
-    plt.figure(figsize=(8, 6))
-    plt.xscale("log")
-    # plt.xlim(1e-5, 1e-3)
-    plt.step(p_f, cdf, where='post')
-    plt.axvline(7.23e-05, color='r', linestyle='--', label='True Value')
-    plt.axvline(confidence_interval[0], color='g', alpha = 0.5, linestyle='--', label='95% Confidence Interval')
-    plt.axvline(confidence_interval[1], color='g', alpha = 0.5, linestyle='--')
-    plt.axvline(ci[0], color='m', alpha = 0.5, linestyle='--', label='99% Confidence Interval')
-    plt.axvline(ci[1], color='m', alpha = 0.5, linestyle='--')
-    plt.xlabel('Probability')
-    plt.ylabel('Empirical CDF')
-    plt.title('Empirical CDF of Probabilities')
-    plt.legend()
-    plt.grid(True)
-    plt.show()
+    # # Plot the empirical CDF
+    # plt.figure(figsize=(8, 6))
+    # plt.xscale("log")
+    # # plt.xlim(1e-5, 1e-3)
+    # plt.step(p_f, cdf, where='post')
+    # plt.axvline(7.23e-05, color='r', linestyle='--', label='True Value')
+    # plt.axvline(confidence_interval[0], color='g', alpha = 0.5, linestyle='--', label='95% Confidence Interval')
+    # plt.axvline(confidence_interval[1], color='g', alpha = 0.5, linestyle='--')
+    # plt.axvline(ci[0], color='m', alpha = 0.5, linestyle='--', label='99% Confidence Interval')
+    # plt.axvline(ci[1], color='m', alpha = 0.5, linestyle='--')
+    # plt.xlabel('Probability')
+    # plt.ylabel('Empirical CDF')
+    # plt.title('Empirical CDF of Probabilities')
+    # plt.legend()
+    # plt.grid(True)
+    # plt.show()
+    
+    failure_probabilities = []
+    for i in range(100):
+        p_f = classical_subset_simulation(N, p0=p_0, L=L)
+        print("The failure p_fability is {:.2e}".format(p_f))
+        failure_probabilities.append(p_f)
+        
+    err = rRMSE(failure_probabilities)
+    print("The relative RMSE is {:.2e}".format(err))

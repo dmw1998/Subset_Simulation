@@ -11,6 +11,7 @@ def y_l(L, gamma):
     # y: a sequence of the threshold values
     
     y = np.zeros(L)
+    y[L-1] = -0.32
     for i in range(L-1):
         l = L - 2 - i
         y[l] = (gamma ** l + gamma ** (l+1)) + y[l+1]
@@ -18,10 +19,13 @@ def y_l(L, gamma):
     return y
 
 if __name__ == "__main__":
-    L = 5
+    L = 4
     
-    for i in range(100):
-        gamma = 0.01 * i
-        y = y_l(L, gamma)
-        print("gamma: ", gamma)
-        print("y: ", y)
+    # for i in range(100):
+    #     gamma = 0.01 * i
+    #     y = y_l(L, gamma)
+    #     print("gamma: ", gamma)
+    #     print("y: ", y)
+    
+    y = y_l(L, 0.5)
+    print("y: ", y)
