@@ -19,6 +19,7 @@ os.environ["MKL_NUM_THREADS"] = "1"
 # 全局常量
 TARGET_RISK = 1.6e-04      # 用于计算相对均方根误差
 RELAXATION_FACTOR = 0.31   # 用于控制细化条件
+q = 0.6622
 U_MAX = 0.535              # 关键值 u_max
 BETA = 1 / 0.01            # KL 展开中用到的 beta
 MU = -0.5 * np.log(1.01)     # log-normal 均值参数
@@ -101,10 +102,8 @@ def IoQ(a_x, n_grid):
     # 求解 PDE
     u_h = Function(V)
     set_log_level(LogLevel.ERROR)
-    solve(a_form == L_form, u_h, bc, solver_parameters={
-        'linear_solver': 'cg',
-        # 'preconditioner': 'ilu'
-    })
+    solve(a_form == L_form, u_h, bc)
+    
     return u_h(1)
 
 def mh_sampling(N, G, thetas, c_l, l, u_max, n_grid, M=150, gamma=0.8):
@@ -261,13 +260,15 @@ def mle(args):
 # 主程序入口
 # -------------------------
 if __name__ == "__main__":
-    np.random.seed(68)
+    np.random.seed(996)
+    # np.random.seed(99)
     error_list = []
     cost_list = []
     sample_number_list = []
 
     # 对于不同的样本规模 N 进行实验
-    for N in [200, 400, 800]:
+    # for N in [200, 400, 600, 800, 1200]:
+    for N in [100, 200, 1200]:
     # for N in [1000]:
         with multiprocessing.Pool(processes=12) as pool:
             seeds = np.random.randint(100, 10000, 100)
@@ -286,7 +287,7 @@ if __name__ == "__main__":
         error_list.append(error)
         
         # 估计成本(使用细化比例计算 cost 权重)
-        exp = RELAXATION_FACTOR ** (-2 * np.linspace(7, 7+6, num=7)) # set q = 2 with l = 5, ..., 11
+        exp = RELAXATION_FACTOR ** (-q * np.linspace(7, 7+6, num=7)) # set q = 2 with l = 7, ..., 13
         cost = np.sum(sample_numbers_mean * exp)
         cost_list.append(cost)
         
@@ -295,6 +296,6 @@ if __name__ == "__main__":
         print(f"Cost: {cost:.2e}\n")
         
         # 保存结果(每次更新)
-        np.save("mle_sr_sample_numbers128.npy", sample_number_list)
-        np.save("mle_sr_error_list128.npy", error_list)
-        np.save("mle_sr_cost_list128.npy", cost_list)
+        np.save("mle_sr_sample_numbers1282.npy", sample_number_list)
+        np.save("mle_sr_error_list1282.npy", error_list)
+        np.save("mle_sr_cost_list1282.npy", cost_list)

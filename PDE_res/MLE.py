@@ -10,8 +10,7 @@ os.environ["PETSC_OPTIONS"] = "-log_view ascii:out.log"
 def rRMSE(p_hat):
     p_hat = np.array(p_hat)
     difference = p_hat - 1.6e-04
-    expaction = np.mean(difference ** 2)
-    return np.sqrt(expaction) / 1.6e-04
+    return np.sqrt(np.mean(difference ** 2)) / 1.6e-04
 
 
 def kl_expan(theta):
@@ -42,8 +41,9 @@ def IoQ(a_x, n_grid):
     mesh = UnitIntervalMesh(n_grid)
     V = FunctionSpace(mesh, 'P', 1)
 
+    coordinates = V.tabulate_dof_coordinates().reshape(-1)
+    a_values = np.interp(coordinates, np.linspace(0, 1, len(a_x)), a_x)
     a = Function(V)
-    a_values = np.interp(mesh.coordinates().flatten(), np.linspace(0, 1, len(a_x)), a_x)
     a.vector()[:] = a_values
 
     u0 = Constant(0.0)
@@ -102,7 +102,7 @@ def mle(args):
     
     theta_ls = np.random.normal(0, 1, (N, M))
     for i in range(N):
-        u_1 = IoQ(kl_expan(theta_ls[i]), n_grid)
+        u_1 = IoQ(kl_expan(theta_ls[i, :]), n_grid)
         G[i] = u_max - u_1
         
     sample_numbers[0] = N
@@ -115,7 +115,7 @@ def mle(args):
     denominator = 1
     mask = G <= c_l
     G = G[mask][:N0]
-    theta_ls = theta_ls[mask][:N0][:]
+    theta_ls = theta_ls[mask][:N0, :]
 
     # l = 2
     c_l_1 = c_l
@@ -147,7 +147,7 @@ def mle(args):
         G, theta_ls = mh_sampling(N, G, theta_ls, c_l, u_max, n_grid, M, gamma=0.8)
         
         G = G[L_b * N0:]
-        theta_ls = theta_ls[L_b * N0:][:]
+        theta_ls = theta_ls[L_b * N0:, :]
         
         c_l = np.percentile(G, P)
         # print("c_", l, ": ", c_l)
@@ -158,7 +158,7 @@ def mle(args):
         
         mask = G <= c_l
         G = G[mask][:N0]
-        theta_ls = theta_ls[mask][:N0][:]
+        theta_ls = theta_ls[mask][:N0, :]
 
         # Resample
         sample_numbers[l-1] += N - N0
@@ -172,20 +172,17 @@ def mle(args):
     sample_numbers[L-1] += N - N0
     G, theta_ls = mh_sampling(N, G, theta_ls, c_l, u_max, n_grid, M, gamma=0.8)
     G = G[L_b * N0:]
-    mask = G <= 0
-    if np.mean(mask) == 0:
-        print(f"c_l = {c_l}, np.mean(G <= 0) = {np.mean(G <= 0)}, random seed = {seed}")
     
     return p0 ** (L-1) * np.mean(G <= 0) / denominator, sample_numbers
 
 if __name__ == "__main__":
-    np.random.seed(42)
+    np.random.seed(199)
     error_list = []
     cost_list = []
 
     for N in [100, 200, 400, 800]:
     # for N in [1000]:
-        seeds = np.random.randint(100, 10000, 100)
+        seeds = np.random.randint(0, 10000, 100)
         with multiprocessing.Pool(processes=12) as pool:
             args = [(N, seed) for seed in seeds]  # Unique seed offset for each worker
             results = list(tqdm(pool.imap(mle, args), total=100, desc=f"N = {N}"))
@@ -196,7 +193,7 @@ if __name__ == "__main__":
         p_f = np.mean(failure_probabilities)
 
         s = np.mean(sample_numbers, axis=0)
-        exp = 0.31 ** (-2 * np.linspace(7, 13, num=7))    # set q = 2 with l
+        exp = 0.31 ** (-0.6622 * np.linspace(7, 13, num=7))    # set q = 2 with l
         cost = np.sum(s * exp)
         cost_list.append(cost)
         error = rRMSE(failure_probabilities)
