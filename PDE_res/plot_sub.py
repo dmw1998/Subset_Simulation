@@ -80,8 +80,8 @@ slope, intercept, r_value, p_value, std_err = linregress(np.log(error_list_mle_s
 axs[2,0].loglog(error_list_mle_sr, np.exp(intercept) * error_list_mle_sr ** slope, "--", color="tab:red", label=f"Fit: $\\epsilon^{{{slope:.2f}}}$")
 
 x = np.linspace(1.1*error_list_mle_sr[0], 0.9*error_list_mle_sr[-1], 100)
-y = 0.6 * cost_list_mle_sr[0] * x ** (-1.6622)
-axs[2,0].loglog(x, y, "--", color = "fuchsia", label=r"$\epsilon^{-1.6622}$")
+y = 0.6 * cost_list_mle_sr[0] * x ** (-2)
+axs[2,0].loglog(x, y, "--", color = "fuchsia", label=r"$\epsilon^{-2}$")
 
 axs[2,0].set_title("MLE with Selective Refinement")
 axs[2,0].legend()
